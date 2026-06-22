@@ -1,0 +1,49 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/**/build/
+out/
+
+# Android Studio / IntelliJ
+*.iml
+.idea/
+!.idea/codeStyles/
+.kotlin/
+captures/
+.navigation/
+.externalNativeBuild/
+.cxx/
+
+# Local configuration (SDK location, signing, secrets)
+local.properties
+*.keystore
+*.jks
+keystore.properties
+secrets.properties
+
+# Android build artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+release/
+proguard/
+
+# Backend / JVM
+*.log
+logs/
+*.h2.db
+*.mv.db
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Misc
+*.hprof
+*.swp
+*~

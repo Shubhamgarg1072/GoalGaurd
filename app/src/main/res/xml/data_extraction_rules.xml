@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Room database -->
+        <include domain="database" path="goalguard.db" />
+        <include domain="database" path="goalguard.db-shm" />
+        <include domain="database" path="goalguard.db-wal" />
+        <!-- DataStore preferences -->
+        <include domain="file" path="datastore/" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="goalguard.db" />
+        <include domain="database" path="goalguard.db-shm" />
+        <include domain="database" path="goalguard.db-wal" />
+        <include domain="file" path="datastore/" />
+    </device-transfer>
+</data-extraction-rules>

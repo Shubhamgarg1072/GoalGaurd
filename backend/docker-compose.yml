@@ -1,0 +1,40 @@
+# Local backend + Postgres. From the repo root:
+#   docker compose -f backend/docker-compose.yml up --build
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: goalguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - goalguard-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      DB_URL: "jdbc:postgresql://db:5432/goalguard"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: "change-me-in-prod"
+      # GOOGLE_WEB_CLIENT_ID: "<your-web-client-id>"   # unset = insecure dev token verification
+      # ANTHROPIC_API_KEY: "<your-key>"                # unset = template coach fallback
+      # COACH_MODEL: "claude-haiku-4-5"                # optional; defaults to claude-opus-4-8
+    ports:
+      - "8080:8080"
+
+volumes:
+  goalguard-pgdata:
