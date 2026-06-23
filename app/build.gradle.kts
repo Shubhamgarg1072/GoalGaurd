@@ -53,6 +53,12 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":core:presentation"))
     implementation(project(":core:design-system"))
+    implementation(project(":core:crypto"))
+
+    // Vault (end-to-end encryption)
+    implementation(project(":feature:vault:domain"))
+    implementation(project(":feature:vault:data"))
+    implementation(project(":feature:vault:presentation"))
 
     // Feature modules
     implementation(project(":feature:onboarding:domain"))
@@ -96,6 +102,10 @@ dependencies {
     // Room (entities & DAOs compiled in :core:database, only need runtime here)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+
+    // SQLCipher: encrypts the local Room database at rest, keyed by the vault DEK.
+    implementation(libs.sqlcipher.android)
+    implementation(libs.androidx.sqlite)
 
     // DataStore
     implementation(libs.androidx.datastore.preferences)

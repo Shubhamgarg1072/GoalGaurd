@@ -7,6 +7,11 @@ import com.time.applauncher.goalgaurd.core.database.dao.GoalDao
 import com.time.applauncher.goalgaurd.core.database.dao.HabitDao
 import com.time.applauncher.goalgaurd.core.database.dao.HabitLogDao
 import com.time.applauncher.goalgaurd.core.database.dao.FocusSessionDao
+import com.time.applauncher.goalgaurd.core.crypto.EncryptedBlob
+import com.time.applauncher.goalgaurd.core.crypto.JsonCryptoCodec
+import com.time.applauncher.goalgaurd.core.crypto.VaultCrypto
+import com.time.applauncher.goalgaurd.core.crypto.VaultKeyManager
+import com.time.applauncher.goalgaurd.core.crypto.WrongPassphraseException
 import com.time.applauncher.goalgaurd.core.domain.BackupBundle
 import com.time.applauncher.goalgaurd.core.domain.BackupRepository
 import com.time.applauncher.goalgaurd.core.domain.DataError
@@ -22,6 +27,8 @@ class RoomBackupRepository(
     private val habitDao: HabitDao,
     private val habitLogDao: HabitLogDao,
     private val focusSessionDao: FocusSessionDao,
+    private val vaultKeyManager: VaultKeyManager,
+    private val codec: JsonCryptoCodec = JsonCryptoCodec(),
 ) : BackupRepository {
 
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = false }
@@ -75,11 +82,43 @@ class RoomBackupRepository(
         Result.Error(DataError.Local.UNKNOWN)
     }
 
-    override suspend fun toJson(bundle: BackupBundle): String =
-        json.encodeToString(BackupBundle.serializer(), bundle)
+    override suspend fun toJson(bundle: BackupBundle): Result<String, DataError> = try {
+        val dek = vaultKeyManager.dekOrNull() ?: return Result.Error(DataError.Local.VAULT_LOCKED)
+        val envelope = vaultKeyManager.currentEnvelope() ?: return Result.Error(DataError.Local.VAULT_LOCKED)
+        val encrypted = EncryptedBackup(
+            envelope = envelope,
+            data = codec.encrypt(BackupBundle.serializer(), bundle, dek).encode(),
+        )
+        Result.Success(json.encodeToString(EncryptedBackup.serializer(), encrypted))
+    } catch (e: Exception) {
+        Result.Error(DataError.Local.UNKNOWN)
+    }
 
-    override suspend fun fromJson(jsonString: String): Result<BackupBundle, DataError> = try {
-        Result.Success(json.decodeFromString(BackupBundle.serializer(), jsonString))
+    override suspend fun fromJson(jsonString: String, passphrase: String?): Result<BackupBundle, DataError> = try {
+        val encrypted = runCatching { json.decodeFromString(EncryptedBackup.serializer(), jsonString) }.getOrNull()
+        if (encrypted == null) {
+            // Legacy, unencrypted backup file.
+            Result.Success(json.decodeFromString(BackupBundle.serializer(), jsonString))
+        } else {
+            val dek = when {
+                passphrase != null -> try {
+                    VaultCrypto.unwrap(encrypted.envelope, passphrase)
+                } catch (e: WrongPassphraseException) {
+                    return Result.Error(DataError.Local.WRONG_PASSPHRASE)
+                }
+                else -> vaultKeyManager.dekOrNull() ?: return Result.Error(DataError.Local.ENCRYPTED_NEEDS_PASSPHRASE)
+            }
+            val bundle = try {
+                codec.decrypt(BackupBundle.serializer(), EncryptedBlob.decode(encrypted.data), dek)
+            } catch (e: Exception) {
+                // In-memory DEK belongs to a different vault than this file — ask for the passphrase.
+                return Result.Error(
+                    if (passphrase == null) DataError.Local.ENCRYPTED_NEEDS_PASSPHRASE
+                    else DataError.Local.WRONG_PASSPHRASE
+                )
+            }
+            Result.Success(bundle)
+        }
     } catch (e: Exception) {
         Result.Error(DataError.Local.UNKNOWN)
     }

@@ -12,6 +12,7 @@ import com.time.applauncher.goalgaurd.di.goalsModule
 import com.time.applauncher.goalgaurd.di.guardModule
 import com.time.applauncher.goalgaurd.di.habitsModule
 import com.time.applauncher.goalgaurd.di.onboardingModule
+import com.time.applauncher.goalgaurd.di.vaultModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 
@@ -32,6 +33,7 @@ class GoalGuardApp : Application() {
                 guardModule,
                 networkModule,
                 authModule,
+                vaultModule,
             )
         }
     }

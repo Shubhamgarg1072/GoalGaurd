@@ -41,6 +41,8 @@ import com.time.applauncher.goalgaurd.feature.coach.presentation.CoachRoot
 import com.time.applauncher.goalgaurd.feature.guard.presentation.GuardRoot
 import com.time.applauncher.goalgaurd.feature.onboarding.presentation.LauncherPermissionsScreen
 import com.time.applauncher.goalgaurd.feature.onboarding.presentation.OnboardingRoot
+import com.time.applauncher.goalgaurd.feature.vault.presentation.VaultSetupRoot
+import com.time.applauncher.goalgaurd.feature.vault.presentation.VaultUnlockRoot
 
 private data class BottomNavItem(
     val label: String,
@@ -136,8 +138,30 @@ fun GoalGuardNavHost(startDestination: Any) {
             composable<SignInRoute> {
                 SignInRoot(
                     onContinue = {
-                        navController.navigate(DashboardRoute) {
+                        navController.navigate(VaultSetupRoute) {
                             popUpTo(SignInRoute) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            // ── Vault set-up (create encryption passphrase; first run) ────────
+            composable<VaultSetupRoute> {
+                VaultSetupRoot(
+                    onComplete = {
+                        navController.navigate(DashboardRoute) {
+                            popUpTo(VaultSetupRoute) { inclusive = true }
+                        }
+                    },
+                )
+            }
+
+            // ── Vault unlock (cold-start gate for a returning user) ───────────
+            composable<VaultUnlockRoute> {
+                VaultUnlockRoot(
+                    onUnlocked = {
+                        navController.navigate(DashboardRoute) {
+                            popUpTo(VaultUnlockRoute) { inclusive = true }
                         }
                     },
                 )

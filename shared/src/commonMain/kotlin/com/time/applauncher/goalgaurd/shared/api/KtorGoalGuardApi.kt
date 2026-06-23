@@ -4,7 +4,6 @@ import com.time.applauncher.goalgaurd.shared.model.AuthResponse
 import com.time.applauncher.goalgaurd.shared.model.CoachInputDto
 import com.time.applauncher.goalgaurd.shared.model.CoachMessageDto
 import com.time.applauncher.goalgaurd.shared.model.GoogleSignInRequest
-import com.time.applauncher.goalgaurd.shared.model.InsightsSummaryDto
 import com.time.applauncher.goalgaurd.shared.model.RefreshRequest
 import com.time.applauncher.goalgaurd.shared.model.SyncRequest
 import com.time.applauncher.goalgaurd.shared.model.SyncResponse
@@ -16,12 +15,10 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.HttpHeaders
-import kotlinx.datetime.LocalDate
 
 /** Builds a [GoalGuardApi] with the default platform HTTP engine, hiding Ktor from callers. */
 fun createGoalGuardApi(baseUrl: String, tokens: TokenProvider = NoopTokenProvider): GoalGuardApi =
@@ -53,15 +50,6 @@ class KtorGoalGuardApi(
 
     override suspend fun generateCoachMessage(input: CoachInputDto): Result<CoachMessageDto, NetworkError> =
         authed { client.post(url("coach/generate")) { it(); setBody(input) } }
-
-    override suspend fun insightsSummary(from: LocalDate, to: LocalDate): Result<InsightsSummaryDto, NetworkError> =
-        authed {
-            client.get(url("insights/summary")) {
-                it()
-                parameter("from", from.toString())
-                parameter("to", to.toString())
-            }
-        }
 
     /**
      * Runs an authenticated call, injecting the bearer token via the supplied builder hook.

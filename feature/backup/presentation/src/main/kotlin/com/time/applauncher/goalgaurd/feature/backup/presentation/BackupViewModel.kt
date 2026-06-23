@@ -10,7 +10,10 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.time.applauncher.goalgaurd.core.domain.BackupBundle
 import com.time.applauncher.goalgaurd.core.domain.BackupRepository
+import com.time.applauncher.goalgaurd.core.domain.DataError
+import com.time.applauncher.goalgaurd.core.domain.Result
 import com.time.applauncher.goalgaurd.core.domain.onFailure
 import com.time.applauncher.goalgaurd.core.domain.onSuccess
 import kotlinx.coroutines.channels.Channel
@@ -50,6 +53,9 @@ class BackupViewModel(
             }
             is BackupAction.OnExportUriReceived -> exportToUri(action.uri)
             is BackupAction.OnImportUriReceived -> importFromUri(action.uri)
+            is BackupAction.OnImportPassphraseSubmit -> submitImportPassphrase(action.passphrase)
+            BackupAction.OnImportPassphraseDismiss ->
+                _state.update { it.copy(pendingImportJson = null, passphraseError = null, isImporting = false) }
         }
     }
 
@@ -58,16 +64,20 @@ class BackupViewModel(
             _state.update { it.copy(isExporting = true, message = null) }
             backupRepository.export()
                 .onSuccess { bundle ->
-                    val jsonStr = backupRepository.toJson(bundle)
-                    try {
-                        context.contentResolver.openOutputStream(uri)?.use { out ->
-                            out.write(jsonStr.toByteArray(Charsets.UTF_8))
+                    when (val encoded = backupRepository.toJson(bundle)) {
+                        is Result.Success -> try {
+                            context.contentResolver.openOutputStream(uri)?.use { out ->
+                                out.write(encoded.data.toByteArray(Charsets.UTF_8))
+                            }
+                            val nowMs = Instant.now().toEpochMilli()
+                            context.backupDataStore.edit { it[LAST_EXPORT_KEY] = nowMs }
+                            _state.update { it.copy(isExporting = false, lastExportMs = nowMs, message = "Backup exported (encrypted)") }
+                        } catch (e: Exception) {
+                            _state.update { it.copy(isExporting = false, message = "Export failed: ${e.message}") }
                         }
-                        val nowMs = Instant.now().toEpochMilli()
-                        context.backupDataStore.edit { it[LAST_EXPORT_KEY] = nowMs }
-                        _state.update { it.copy(isExporting = false, lastExportMs = nowMs, message = "Backup exported successfully") }
-                    } catch (e: Exception) {
-                        _state.update { it.copy(isExporting = false, message = "Export failed: ${e.message}") }
+                        is Result.Error -> _state.update {
+                            it.copy(isExporting = false, message = "Unlock the vault before exporting")
+                        }
                     }
                 }
                 .onFailure {
@@ -79,30 +89,50 @@ class BackupViewModel(
     private fun importFromUri(uri: Uri) {
         viewModelScope.launch {
             _state.update { it.copy(isImporting = true, message = null) }
-            try {
-                val jsonStr = context.contentResolver.openInputStream(uri)
-                    ?.use { it.readBytes().toString(Charsets.UTF_8) }
-                    ?: run {
-                        _state.update { it.copy(isImporting = false, message = "Could not read file") }
-                        return@launch
-                    }
-                backupRepository.fromJson(jsonStr)
-                    .onSuccess { bundle ->
-                        backupRepository.importBundle(bundle)
-                            .onSuccess {
-                                _state.update { it.copy(isImporting = false, message = "Restore complete") }
-                            }
-                            .onFailure {
-                                _state.update { it.copy(isImporting = false, message = "Restore failed") }
-                            }
-                    }
-                    .onFailure {
-                        _state.update { it.copy(isImporting = false, message = "Invalid backup file") }
-                    }
+            val jsonStr = try {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
             } catch (e: Exception) {
-                _state.update { it.copy(isImporting = false, message = "Restore failed: ${e.message}") }
+                null
+            }
+            if (jsonStr == null) {
+                _state.update { it.copy(isImporting = false, message = "Could not read file") }
+                return@launch
+            }
+            decodeAndApply(jsonStr, passphrase = null)
+        }
+    }
+
+    private fun submitImportPassphrase(passphrase: String) {
+        val jsonStr = _state.value.pendingImportJson ?: return
+        viewModelScope.launch {
+            _state.update { it.copy(passphraseError = null) }
+            decodeAndApply(jsonStr, passphrase = passphrase)
+        }
+    }
+
+    /** Decrypts (optionally with [passphrase]) then restores. Prompts for a passphrase if the file needs one. */
+    private suspend fun decodeAndApply(jsonStr: String, passphrase: String?) {
+        when (val decoded = backupRepository.fromJson(jsonStr, passphrase)) {
+            is Result.Success -> applyBundle(decoded.data)
+            is Result.Error -> when (decoded.error) {
+                DataError.Local.ENCRYPTED_NEEDS_PASSPHRASE ->
+                    _state.update { it.copy(isImporting = true, pendingImportJson = jsonStr, passphraseError = null) }
+                DataError.Local.WRONG_PASSPHRASE ->
+                    _state.update { it.copy(passphraseError = "Incorrect passphrase.") }
+                else ->
+                    _state.update { it.copy(isImporting = false, pendingImportJson = null, message = "Invalid backup file") }
             }
         }
+    }
+
+    private suspend fun applyBundle(bundle: BackupBundle) {
+        backupRepository.importBundle(bundle)
+            .onSuccess {
+                _state.update { it.copy(isImporting = false, pendingImportJson = null, passphraseError = null, message = "Restore complete") }
+            }
+            .onFailure {
+                _state.update { it.copy(isImporting = false, pendingImportJson = null, message = "Restore failed") }
+            }
     }
 
     private fun observeLastExport() {
@@ -121,13 +151,20 @@ data class BackupState(
     val isImporting: Boolean = false,
     val lastExportMs: Long? = null,
     val message: String? = null,
-)
+    /** Non-null while we await the passphrase for an encrypted backup made by a different vault. */
+    val pendingImportJson: String? = null,
+    val passphraseError: String? = null,
+) {
+    val isAwaitingPassphrase: Boolean get() = pendingImportJson != null
+}
 
 sealed interface BackupAction {
     data object OnExportClick : BackupAction
     data object OnImportClick : BackupAction
     data class OnExportUriReceived(val uri: Uri) : BackupAction
     data class OnImportUriReceived(val uri: Uri) : BackupAction
+    data class OnImportPassphraseSubmit(val passphrase: String) : BackupAction
+    data object OnImportPassphraseDismiss : BackupAction
 }
 
 sealed interface BackupEvent {

@@ -39,11 +39,17 @@ include(":core:data")
 include(":core:database")
 include(":core:presentation")
 include(":core:design-system")
+include(":core:crypto")
 
 // Feature: Auth (Google Sign-In + optional cloud)
 include(":feature:auth:domain")
 include(":feature:auth:data")
 include(":feature:auth:presentation")
+
+// Feature: Vault (passphrase-based end-to-end encryption)
+include(":feature:vault:domain")
+include(":feature:vault:data")
+include(":feature:vault:presentation")
 
 // Feature: Onboarding
 include(":feature:onboarding:domain")

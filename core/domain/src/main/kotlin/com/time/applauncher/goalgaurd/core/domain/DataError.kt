@@ -20,6 +20,9 @@ sealed interface DataError : Error {
     enum class Local : DataError {
         DISK_FULL,
         NOT_FOUND,
+        VAULT_LOCKED,
+        ENCRYPTED_NEEDS_PASSPHRASE,
+        WRONG_PASSPHRASE,
         UNKNOWN
     }
 }

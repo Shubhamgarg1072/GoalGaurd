@@ -93,6 +93,19 @@ data class BackupBundle(
 interface BackupRepository {
     suspend fun export(): Result<BackupBundle, DataError>
     suspend fun importBundle(bundle: BackupBundle): EmptyResult<DataError>
-    suspend fun toJson(bundle: BackupBundle): String
-    suspend fun fromJson(json: String): Result<BackupBundle, DataError>
+
+    /**
+     * Serialises [bundle] to an **encrypted** backup string under the unlocked vault key. Fails with
+     * [DataError.Local.VAULT_LOCKED] if the vault is locked.
+     */
+    suspend fun toJson(bundle: BackupBundle): Result<String, DataError>
+
+    /**
+     * Reads a backup string. Encrypted backups need the [passphrase] that produced them (or, if the
+     * matching vault is currently unlocked on this device, decrypt with the in-memory key when
+     * [passphrase] is null). Legacy plaintext backups are still accepted. Returns
+     * [DataError.Local.ENCRYPTED_NEEDS_PASSPHRASE] when an encrypted backup can't be opened with the
+     * in-memory key and no passphrase was supplied, and [DataError.Local.WRONG_PASSPHRASE] on a bad one.
+     */
+    suspend fun fromJson(json: String, passphrase: String? = null): Result<BackupBundle, DataError>
 }

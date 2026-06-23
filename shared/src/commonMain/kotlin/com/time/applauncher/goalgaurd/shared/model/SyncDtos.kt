@@ -1,68 +1,42 @@
 package com.time.applauncher.goalgaurd.shared.model
 
 import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.LocalDateTime
 import kotlinx.serialization.Serializable
 
-// Wire DTOs for delta sync. kotlinx-datetime types serialize as ISO-8601 strings.
-// A `deleted` tombstone lets last-write-wins propagate deletions.
+// End-to-end-encrypted wire DTOs. The server stores and merges these without ever seeing the
+// plaintext content: only the merge metadata (id / updatedAt / deleted, or a blind dedupe index)
+// is in clear. [blob] is `EncryptedBlob.encode` — AES-GCM ciphertext under the user's data key.
 
+/**
+ * An encrypted goal / habit / focus-session record. Last-write-wins merges on [updatedAt]; a
+ * [deleted] tombstone propagates deletions. [blob] is the opaque encrypted content.
+ */
 @Serializable
-data class GoalSyncDto(
+data class EncryptedRecordDto(
     val id: String,
-    val name: String,
-    val emoji: String,
-    val targetValue: Double,
-    val currentValue: Double,
-    val unit: String,
-    val targetDate: LocalDate,
-    val priority: String,
-    val createdAt: LocalDate,
     val updatedAt: Instant,
     val deleted: Boolean = false,
+    val blob: String,
 )
 
+/**
+ * An encrypted habit log (append-only). [dedupeKey] is a blind index — `HMAC(indexKey, habitId|date)`
+ * — letting the server enforce the per-user union without learning the habit or date. [blob] is the
+ * opaque encrypted content.
+ */
 @Serializable
-data class HabitSyncDto(
+data class EncryptedLogDto(
     val id: String,
-    val goalId: String? = null,
-    val name: String,
-    val emoji: String,
-    val frequency: String,
-    val difficulty: String,
-    val reminderTime: String? = null,
-    val streak: Int,
-    val isActive: Boolean,
-    val updatedAt: Instant,
-    val deleted: Boolean = false,
-)
-
-@Serializable
-data class HabitLogSyncDto(
-    val id: String,
-    val habitId: String,
-    val date: LocalDate,
-    val isCompleted: Boolean,
-)
-
-@Serializable
-data class FocusSessionSyncDto(
-    val id: String,
-    val durationMinutes: Int,
-    val startedAt: LocalDateTime,
-    val completedAt: LocalDateTime? = null,
-    val isCompleted: Boolean,
-    val updatedAt: Instant,
-    val deleted: Boolean = false,
+    val dedupeKey: String,
+    val blob: String,
 )
 
 @Serializable
 data class SyncPayload(
-    val goals: List<GoalSyncDto> = emptyList(),
-    val habits: List<HabitSyncDto> = emptyList(),
-    val habitLogs: List<HabitLogSyncDto> = emptyList(),
-    val focusSessions: List<FocusSessionSyncDto> = emptyList(),
+    val goals: List<EncryptedRecordDto> = emptyList(),
+    val habits: List<EncryptedRecordDto> = emptyList(),
+    val habitLogs: List<EncryptedLogDto> = emptyList(),
+    val focusSessions: List<EncryptedRecordDto> = emptyList(),
 )
 
 /** [since] = the client's last successful sync time; null = first sync (full push). */

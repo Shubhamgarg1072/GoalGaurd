@@ -10,9 +10,13 @@ import androidx.compose.runtime.setValue
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.time.applauncher.goalgaurd.core.designsystem.theme.GoalGuardTheme
 import com.time.applauncher.goalgaurd.feature.onboarding.domain.OnboardingRepository
+import com.time.applauncher.goalgaurd.feature.vault.domain.VaultRepository
+import com.time.applauncher.goalgaurd.feature.vault.domain.VaultStatus
 import com.time.applauncher.goalgaurd.navigation.DashboardRoute
 import com.time.applauncher.goalgaurd.navigation.GoalGuardNavHost
 import com.time.applauncher.goalgaurd.navigation.OnboardingRoute
+import com.time.applauncher.goalgaurd.navigation.VaultSetupRoute
+import com.time.applauncher.goalgaurd.navigation.VaultUnlockRoute
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,6 +28,7 @@ import org.koin.android.ext.android.inject
 class MainActivity : ComponentActivity() {
 
     private val onboardingRepository: OnboardingRepository by inject()
+    private val vaultRepository: VaultRepository by inject()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,7 +44,13 @@ class MainActivity : ComponentActivity() {
 
         scope.launch {
             val onboardingComplete = onboardingRepository.isOnboardingComplete().first()
-            startDestination = if (onboardingComplete) DashboardRoute else OnboardingRoute
+            startDestination = when {
+                !onboardingComplete -> OnboardingRoute
+                // Returning user with an encrypted vault: gate the app behind unlock / first-time set-up.
+                vaultRepository.currentStatus() == VaultStatus.NOT_SET_UP -> VaultSetupRoute
+                vaultRepository.currentStatus() == VaultStatus.LOCKED -> VaultUnlockRoute
+                else -> DashboardRoute
+            }
             isReady = true  // triggers both Compose recomposition AND splash dismissal
         }
 

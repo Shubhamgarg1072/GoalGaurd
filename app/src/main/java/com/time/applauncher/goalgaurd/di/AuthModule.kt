@@ -9,6 +9,6 @@ import org.koin.dsl.module
 
 val authModule = module {
     single<AuthRepository> { GoogleAuthRepository(api = get(), tokenStore = get()) }
-    single { SyncRepository(api = get(), backupRepository = get()) }
+    single { SyncRepository(api = get(), backupRepository = get(), vaultKeyManager = get()) }
     viewModelOf(::SignInViewModel)
 }

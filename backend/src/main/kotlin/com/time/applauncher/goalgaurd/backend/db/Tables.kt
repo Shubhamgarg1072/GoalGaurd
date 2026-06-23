@@ -20,17 +20,13 @@ object RefreshTokens : Table("refresh_tokens") {
     override val primaryKey = PrimaryKey(token)
 }
 
+// End-to-end-encrypted storage. Content lives entirely in the opaque `blob` (AES-GCM ciphertext);
+// the server keeps only the merge metadata it needs and can never read the user's data.
+
 object Goals : Table("goals") {
     val id = varchar("id", 64)
     val userId = varchar("user_id", 64).index()
-    val name = varchar("name", 512)
-    val emoji = varchar("emoji", 16)
-    val targetValue = double("target_value")
-    val currentValue = double("current_value")
-    val unit = varchar("unit", 64)
-    val targetDate = varchar("target_date", 32)      // ISO LocalDate
-    val priority = varchar("priority", 16)
-    val createdAt = varchar("created_at", 32)         // ISO LocalDate
+    val blob = text("blob")                           // encrypted content
     val updatedAt = timestamp("updated_at")
     val deleted = bool("deleted").default(false)
     override val primaryKey = PrimaryKey(id)
@@ -39,14 +35,7 @@ object Goals : Table("goals") {
 object Habits : Table("habits") {
     val id = varchar("id", 64)
     val userId = varchar("user_id", 64).index()
-    val goalId = varchar("goal_id", 64).nullable()
-    val name = varchar("name", 512)
-    val emoji = varchar("emoji", 16)
-    val frequency = varchar("frequency", 16)
-    val difficulty = varchar("difficulty", 16)
-    val reminderTime = varchar("reminder_time", 16).nullable()
-    val streak = integer("streak")
-    val isActive = bool("is_active")
+    val blob = text("blob")                           // encrypted content
     val updatedAt = timestamp("updated_at")
     val deleted = bool("deleted").default(false)
     override val primaryKey = PrimaryKey(id)
@@ -55,23 +44,19 @@ object Habits : Table("habits") {
 object HabitLogs : Table("habit_logs") {
     val id = varchar("id", 64)
     val userId = varchar("user_id", 64).index()
-    val habitId = varchar("habit_id", 64)
-    val date = varchar("date", 32)                    // ISO LocalDate
-    val isCompleted = bool("is_completed")
+    val dedupeKey = varchar("dedupe_key", 64)         // blind index = HMAC(indexKey, habitId|date)
+    val blob = text("blob")                           // encrypted content
     override val primaryKey = PrimaryKey(id)
 
     init {
-        uniqueIndex("uq_habit_log", userId, habitId, date)
+        uniqueIndex("uq_habit_log", userId, dedupeKey)
     }
 }
 
 object FocusSessions : Table("focus_sessions") {
     val id = varchar("id", 64)
     val userId = varchar("user_id", 64).index()
-    val durationMinutes = integer("duration_minutes")
-    val startedAt = varchar("started_at", 48)         // ISO LocalDateTime
-    val completedAt = varchar("completed_at", 48).nullable()
-    val isCompleted = bool("is_completed")
+    val blob = text("blob")                           // encrypted content
     val updatedAt = timestamp("updated_at")
     val deleted = bool("deleted").default(false)
     override val primaryKey = PrimaryKey(id)

@@ -9,8 +9,6 @@ import com.time.applauncher.goalgaurd.backend.coach.CoachService
 import com.time.applauncher.goalgaurd.backend.coach.coachRoutes
 import com.time.applauncher.goalgaurd.backend.config.AppConfig
 import com.time.applauncher.goalgaurd.backend.db.DatabaseFactory
-import com.time.applauncher.goalgaurd.backend.insights.InsightsService
-import com.time.applauncher.goalgaurd.backend.insights.insightsRoutes
 import com.time.applauncher.goalgaurd.backend.sync.SyncService
 import com.time.applauncher.goalgaurd.backend.sync.syncRoutes
 import com.time.applauncher.goalgaurd.shared.api.GoalGuardJson
@@ -46,7 +44,6 @@ fun Application.module(config: AppConfig) {
     val authService = AuthService(config, jwtService, googleVerifier)
     val syncService = SyncService()
     val coachService = CoachService(config)
-    val insightsService = InsightsService()
 
     install(ContentNegotiation) { json(GoalGuardJson) }
     install(CallLogging)
@@ -75,6 +72,5 @@ fun Application.module(config: AppConfig) {
         authRoutes(authService)
         syncRoutes(syncService)
         coachRoutes(coachService)
-        insightsRoutes(insightsService)
     }
 }

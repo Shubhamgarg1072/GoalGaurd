@@ -20,8 +20,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.testApplication
 import kotlinx.datetime.Instant
-import kotlinx.datetime.LocalDate
-import com.time.applauncher.goalgaurd.shared.model.GoalSyncDto
+import com.time.applauncher.goalgaurd.shared.model.EncryptedRecordDto
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -67,16 +66,17 @@ class AuthRouteTest {
             contentType(ContentType.Application.Json); setBody(SyncRequest())
         }.status)
 
-        // Authenticated sync pushes and pulls back a goal.
-        val goal = GoalSyncDto(
-            "g1", "House", "🏠", 100.0, 25.0, "%", LocalDate(2030, 1, 1), "HIGH",
-            LocalDate(2026, 1, 1), Instant.parse("2026-06-18T00:00:00Z"),
+        // Authenticated sync pushes and pulls back an (opaque, encrypted) goal record.
+        val goal = EncryptedRecordDto(
+            id = "g1",
+            updatedAt = Instant.parse("2026-06-18T00:00:00Z"),
+            blob = "ciphertext-blob",
         )
         val sync: SyncResponse = client.post("/sync") {
             bearerAuth(auth.accessToken)
             contentType(ContentType.Application.Json)
             setBody(SyncRequest(changes = SyncPayload(goals = listOf(goal))))
         }.body()
-        assertEquals(25.0, sync.changes.goals.single { it.id == "g1" }.currentValue)
+        assertEquals("ciphertext-blob", sync.changes.goals.single { it.id == "g1" }.blob)
     }
 }

@@ -16,6 +16,7 @@ val backupModule = module {
             habitDao = get(),
             habitLogDao = get(),
             focusSessionDao = get(),
+            vaultKeyManager = get(),
         )
     }
     viewModel { BackupViewModel(get(), androidContext()) }
